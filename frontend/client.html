@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess-Like Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+
+        table {
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        td {
+            width: 50px;
+            height: 50px;
+            border: 1px solid black;
+            text-align: center;
+            vertical-align: middle;
+            cursor: pointer;
+        }
+
+        .playerA {
+            background-color: lightblue;
+        }
+
+        .playerB {
+            background-color: lightcoral;
+        }
+
+        .selected {
+            border: 2px solid green;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Chess-Like Game</h1>
+
+    <div id="game-board"></div>
+
+    <div id="move-controls" style="display:none;">
+        <h3>Select Move Direction</h3>
+        <button onclick="sendMove('L')">Left</button>
+        <button onclick="sendMove('R')">Right</button>
+        <button onclick="sendMove('F')">Forward</button>
+        <button onclick="sendMove('B')">Backward</button>
+    </div>
+
+    <script>
+        let selectedPiece = null;  // Track the selected piece
+        let selectedPlayer = null;  // Track the player who selected the piece
+        let ws = new WebSocket('ws://localhost:8080');
+
+        ws.onopen = () => {
+            console.log('Connected to WebSocket server');
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.error) {
+                alert(`Error: ${data.error}`);
+            } else if (data.gameState) {
+                renderGameState(data.gameState);
+            } else if (data.winner) {
+                alert(`Player ${data.winner} wins!`);
+            }
+        };
+
+        function renderGameState(gameState) {
+            const boardDiv = document.getElementById('game-board');
+            boardDiv.innerHTML = ''; // Clear the board
+
+            const table = document.createElement('table');
+
+            for (let row = 0; row < 5; row++) {
+                const tr = document.createElement('tr');
+                for (let col = 0; col < 5; col++) {
+                    const td = document.createElement('td');
+                    const cell = gameState[row][col];
+
+                    if (cell) {
+                        td.textContent = `${cell.player}-${cell.type}`;
+                        td.classList.add(`player${cell.player}`);
+                        td.onclick = () => selectPiece(cell, row, col);  // Add click handler
+                    }
+                    tr.appendChild(td);
+                }
+                table.appendChild(tr);
+            }
+            boardDiv.appendChild(table);
+        }
+
+        function selectPiece(piece, row, col) {
+            selectedPiece = { piece, row, col };  // Store selected piece and its position
+            selectedPlayer = piece.player;  // Track which player selected the piece
+            document.getElementById('move-controls').style.display = 'block';  // Show move controls
+            highlightSelected(row, col);  // Highlight the selected piece
+        }
+
+        function highlightSelected(row, col) {
+            const cells = document.querySelectorAll('td');
+            cells.forEach(cell => cell.classList.remove('selected'));
+            const selectedCell = document.querySelector(`tr:nth-child(${row + 1}) td:nth-child(${col + 1})`);
+            selectedCell.classList.add('selected');
+        }
+
+        function sendMove(direction) {
+            if (!selectedPiece) {
+                alert('Select a piece first!');
+                return;
+            }
+
+            const move = {
+                player: selectedPlayer,
+                character: selectedPiece.piece.type,
+                direction
+            };
+
+            // Send the move to the server
+            ws.send(JSON.stringify(move));
+
+            // Reset after move
+            selectedPiece = null;
+            selectedPlayer = null;
+            document.getElementById('move-controls').style.display = 'none';
+        }
+    </script>
+</body>
+
+</html>
